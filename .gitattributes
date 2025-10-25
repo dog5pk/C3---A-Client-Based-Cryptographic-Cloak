@@ -1,0 +1,20 @@
+# Normalize line endings for all text
+* text=auto eol=lf
+
+# Treat common binary artifacts as binary (no diff noise)
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.pdf binary
+*.zip binary
+*.tar binary
+*.gz binary
+*.tgz binary
+*.xz binary
+
+# Shell scripts: ensure LF endings
+*.sh text eol=lf
+
+# Markdown stays text (keeps diffs readable)
+*.md text
