@@ -1,0 +1,23 @@
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.ipynb_checkpoints/
+
+# Go
+*.test
+*.coverprofile
+
+# Runtime output (keep repos clean)
+logs/
+pids/
+artifacts/
+dist/
+build/
+*.log
