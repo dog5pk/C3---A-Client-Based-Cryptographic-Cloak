@@ -1,7 +1,5 @@
-# Default ownership
-* @dog5pk
+# Default ownership for everything in this repo
+*       @dog5pk
 
-# (Add project-specific owners below as folders emerge)
-# /client/ @dog5pk
-# /relay/  @dog5pk
-# /docs/   @dog5pk
+# Explicit (optional clarity)
+investor_box/   @dog5pk
