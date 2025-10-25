@@ -13,17 +13,23 @@ Test through relay1:
 Stop:
   chmod +x stop_local.sh && ./stop_local.sh
 
+## One-Command Demo (stub, safe anywhere)
+  chmod +x demo.sh && ./demo.sh --preset low --duration 10
+
+- Produces `artifacts/<timestamp>/summary.json`
+- Prints a 6-line summary on stdout
+- No binaries start yet; this is a safe placeholder while M6 is implemented
+
 ## What’s Here
-- **Demo harness**: `run_local.sh`, `stop_local.sh`, `start_chain.sh`, `stop_chain.sh`
-- **Binaries**: `bin_relay1`, `bin_relay2`, `bin_upstream` (used by the harness)
+- **Demo harness**: `demo.sh`, `run_local.sh`, `stop_local.sh`, `start_chain.sh`, `stop_chain.sh`
 - **Runtime**: `logs/`, `pids/`, `artifacts/` (git-ignored)
-- **Investor docs**: `investor_box/` (executive summary only; no private planning files)
+- **Investor docs**: `investor_box/` (executive summary only; personal planning stays off-repo)
 
 ## Status
-- Local scaffold validated. Next milestones: D-Bridge multi-hop scheduling, mobile client shim, obfuscation presets, metrics dashboard.
+- Scaffold validated. Next milestones: D-Bridge multi-hop scheduling (M1), demo polish & analyzer plots (M2), Android client shim (M3), obfuscation presets (M4), metrics/health endpoints (M5), one-command demo (M6), whitepaper v1.0 (M7).
 
 ## Security
-Responsible disclosure policy: see `SECURITY.md`.  
+Responsible disclosure: see `SECURITY.md`  
 Contact: **Dog5pkPrrsents@proton.me**
 
 ## License
