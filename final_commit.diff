@@ -1,0 +1,674 @@
+commit c3_integration_ready
+Author: Dog5pk <Dog5pkPrrsents@proton.me>
+Date:   2025-10-26 00:00:00 +0000
+
+    C³ Integration Ready — End-to-End Obfuscation Harness + Cactus PoC
+
+diff --git a/demo.sh b/demo.sh
+new file mode 100755
+index 0000000..f6e3d9c
+--- /dev/null
++++ b/demo.sh
+@@
++#!/usr/bin/env bash
++#
++# demo.sh orchestrates an end-to-end demonstration of the C3 privacy
++# architecture using Docker Compose.  It builds the images, starts
++# nginx and the two relay stubs, runs a baseline traffic scenario and
++# then an obfuscated traffic scenario.  For each scenario it captures
++# the relay logs and analyses them using analyzer.py to compute
++# packet size and timing statistics.  Finally it displays the
++# results and brings down the services.
++
++set -euo pipefail
++
++ROOT_DIR="$(dirname "$0")"
++cd "$ROOT_DIR"
++
++echo "[demo] Building Docker images..."
++docker compose build
++
++echo "[demo] Starting nginx and relays..."
++# start services in the background; client will be run via docker compose run
++docker compose up -d nginx relay2 relay1
++
++# give services time to become ready
++sleep 2
++
++run_test() {
++    local mode=$1
++    local log_file=$2
++    # restart relay1 container to clear logs between runs
++    echo "[demo] Restarting relay1 for clean logs before ${mode} run..."
++    docker compose restart -t 0 relay1
++    # allow restart to complete
++    sleep 2
++    echo "[demo] Running client in ${mode} mode..."
++    docker compose run --rm client --mode "${mode}" --host relay1 --port 9001 --count 3
++    echo "[demo] Capturing relay1 logs for ${mode} run..."
++    docker compose logs --no-color relay1 > "${log_file}"
++}
++
++run_test baseline baseline.log
++run_test obfuscate obfuscate.log
++
++echo "[demo] Computing metrics..."
++python3 analyzer.py baseline.log > baseline_metrics.txt
++python3 analyzer.py obfuscate.log > obfuscate_metrics.txt
++
++echo "\n==== Baseline metrics ===="
++cat baseline_metrics.txt
++echo "\n==== Obfuscation metrics ===="
++cat obfuscate_metrics.txt
++
++echo "[demo] Cleaning up containers..."
++docker compose down
++
++echo "[demo] Demo complete."
++
+diff --git a/obfuscator.py b/obfuscator.py
+new file mode 100755
+index 0000000..d1fa5c7
+--- /dev/null
++++ b/obfuscator.py
+@@
++#!/usr/bin/env python3
++"""
++obfuscator.py - minimal Cactus-style client-side obfuscation proof-of-concept.
++
++This script uses the BCC library to attach a kprobe to the kernel
++`tcp_sendmsg()` function in order to record the size of each outgoing
++TCP send operation.  It also implements two simple obfuscation
++primitives, random segmentation and random padding, in user space.
++"""
++
++from __future__ import annotations
++
++import sys
++import time
++import socket
++import random
++import threading
++from typing import List, Tuple
++
++try:
++    from bcc import BPF
++except ImportError as e:
++    print("Error: bcc library not found. Install it with 'sudo apt install python3-bcc'", file=sys.stderr)
++    raise
++
++_BPF_PROGRAM = """
++#include <uapi/linux/ptrace.h>
++
++int trace_tcp_sendmsg(struct pt_regs *ctx, struct sock *sk, struct msghdr *msg, size_t size) {
++    bpf_trace_printk("%d\n", size);
++    return 0;
++}
++"""
++
++def attach_bpf() -> BPF:
++    b = BPF(text=_BPF_PROGRAM)
++    b.attach_kprobe(event="tcp_sendmsg", fn_name="trace_tcp_sendmsg")
++    return b
++
++def run_bpf_logger(bpf_obj: BPF, stop_event: threading.Event) -> None:
++    while not stop_event.is_set():
++        try:
++            (task, pid, cpu, flags, ts, msg) = bpf_obj.trace_fields(timeout=1000)
++            print(f"[BPF] send size: {msg.strip().decode()} bytes", file=sys.stderr)
++        except ValueError:
++            continue
++        except KeyboardInterrupt:
++            break
++
++def random_segments(data: bytes, min_size: int = 16, max_size: int = 64) -> List[bytes]:
++    segments: List[bytes] = []
++    pos = 0
++    length = len(data)
++    while pos < length:
++        remaining = length - pos
++        seg_len = random.randint(min_size, max_size)
++        seg_len = min(seg_len, remaining)
++        segments.append(data[pos:pos + seg_len])
++        pos += seg_len
++    return segments
++
++def random_pad(data: bytes, min_pad: int = 0, max_pad: int = 32) -> bytes:
++    pad_len = random.randint(min_pad, max_pad)
++    return data + b"\x00" * pad_len
++
++def send_request(segmented: bool, padded: bool) -> Tuple[List[int], List[float]]:
++    addr = ("127.0.0.1", 8080)
++    request = b"GET / HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n"
++    if padded:
++        request = random_pad(request)
++    segments = random_segments(request) if segmented else [request]
++    pkt_sizes: List[int] = []
++    timestamps: List[float] = []
++    with socket.create_connection(addr) as sock:
++        for seg in segments:
++            sock.sendall(seg)
++            pkt_sizes.append(len(seg))
++            timestamps.append(time.time())
++        while True:
++            data = sock.recv(4096)
++            if not data:
++                break
++    gaps: List[float] = []
++    for i in range(1, len(timestamps)):
++        gaps.append(timestamps[i] - timestamps[i - 1])
++    return pkt_sizes, gaps
++
++def print_metrics(label: str, sizes: List[int], gaps: List[float]) -> None:
++    print(f"--- {label} ---")
++    print(f"Packets sent: {len(sizes)}")
++    print(f"Sizes: {sizes}")
++    if gaps:
++        print(f"Inter-packet gaps (s): {[round(g, 6) for g in gaps]}")
++    else:
++        print("Inter-packet gaps: n/a (single segment)")
++
++def main():
++    if len(sys.argv) != 2 or sys.argv[1] not in {"baseline", "obfuscate"}:
++        print("Usage: python3 obfuscator.py [baseline|obfuscate]", file=sys.stderr)
++        sys.exit(1)
++    mode = sys.argv[1]
++    bpf_obj = attach_bpf()
++    stop_event = threading.Event()
++    logger_thread = threading.Thread(target=run_bpf_logger, args=(bpf_obj, stop_event), daemon=True)
++    logger_thread.start()
++    try:
++        if mode == "baseline":
++            sizes, gaps = send_request(segmented=False, padded=False)
++            print_metrics("Baseline", sizes, gaps)
++        else:
++            sizes, gaps = send_request(segmented=True, padded=True)
++            print_metrics("Obfuscated", sizes, gaps)
++    finally:
++        stop_event.set()
++        logger_thread.join(timeout=1)
++
++if __name__ == "__main__":
++    main()
++
+diff --git a/train_eval.py b/train_eval.py
+new file mode 100755
+index 0000000..b8c3eea
+--- /dev/null
++++ b/train_eval.py
+@@
++#!/usr/bin/env python3
++"""
++Training and evaluation script for website-fingerprinting classification.
++"""
++import argparse
++import os
++import numpy as np
++import pandas as pd
++from sklearn.ensemble import RandomForestClassifier
++from sklearn.model_selection import train_test_split
++from sklearn.preprocessing import LabelEncoder, label_binarize
++from sklearn.metrics import classification_report, confusion_matrix, roc_curve, auc
++import matplotlib.pyplot as plt
++
++def load_dataset(csv_path: str):
++    df = pd.read_csv(csv_path)
++    if "label" not in df.columns:
++        raise ValueError("CSV must contain a 'label' column")
++    labels = df["label"].values
++    X = df.drop(columns=["label"]).values
++    le = LabelEncoder()
++    y = le.fit_transform(labels)
++    return X, y, le
++
++def train_model(X, y):
++    clf = RandomForestClassifier(n_estimators=200, class_weight="balanced", random_state=42, n_jobs=-1)
++    clf.fit(X, y)
++    return clf
++
++def evaluate_model(clf, X_test, y_test, le, output_dir):
++    y_pred = clf.predict(X_test)
++    report = classification_report(y_test, y_pred, target_names=le.classes_, digits=4)
++    print(report)
++    cm = confusion_matrix(y_test, y_pred)
++    print(cm)
++    try:
++        y_score = clf.predict_proba(X_test)
++    except AttributeError:
++        return
++    y_test_bin = label_binarize(y_test, classes=np.arange(len(le.classes_)))
++    fpr, tpr, _ = roc_curve(y_test_bin.ravel(), y_score.ravel())
++    roc_auc = auc(fpr, tpr)
++    plt.figure()
++    plt.plot(fpr, tpr, lw=2, label=f"micro-average ROC (AUC={roc_auc:.2f})")
++    plt.plot([0,1], [0,1], linestyle="--")
++    plt.xlabel("FPR")
++    plt.ylabel("TPR")
++    plt.legend(loc="lower right")
++    os.makedirs(output_dir, exist_ok=True)
++    plt.savefig(os.path.join(output_dir, "roc_curve.png"))
++
++def main():
++    parser = argparse.ArgumentParser()
++    parser.add_argument("features_csv")
++    parser.add_argument("--output_dir", default="evaluation")
++    parser.add_argument("--test_size", type=float, default=0.2)
++    args = parser.parse_args()
++    X, y, le = load_dataset(args.features_csv)
++    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=args.test_size, random_state=42, stratify=y)
++    clf = train_model(X_train, y_train)
++    evaluate_model(clf, X_test, y_test, le, args.output_dir)
++
++if __name__ == "__main__":
++    main()
++
+diff --git a/feature_extractor.py b/feature_extractor.py
+new file mode 100755
+index 0000000..0bca57b
+--- /dev/null
++++ b/feature_extractor.py
+@@
++#!/usr/bin/env python3
++"""
++Feature extraction for website-fingerprinting experiments.
++"""
++import argparse
++import csv
++import os
++import sys
++try:
++    from scapy.all import rdpcap, IP
++except Exception:
++    print("scapy is required. Install with: pip install scapy", file=sys.stderr)
++    sys.exit(1)
++import numpy as np
++
++def extract_features_from_pcap(pcap_path):
++    try:
++        packets = rdpcap(pcap_path)
++    except Exception as e:
++        print(f"[warn] failed to read {pcap_path}: {e}", file=sys.stderr)
++        return None
++    pkt_times = []
++    pkt_sizes = []
++    client_ip = None
++    for pkt in packets:
++        if not pkt.haslayer(IP):
++            continue
++        ip_layer = pkt[IP]
++        size = len(pkt)
++        if client_ip is None:
++            client_ip = ip_layer.src
++        direction = 1 if ip_layer.src == client_ip else -1
++        pkt_times.append(float(pkt.time))
++        pkt_sizes.append(int(size) * direction)
++    if not pkt_sizes:
++        return None
++    inter_arrivals = [pkt_times[i] - pkt_times[i - 1] for i in range(1, len(pkt_times))]
++    arr_sizes = np.array(pkt_sizes, dtype=float)
++    arr_inter = np.array(inter_arrivals, dtype=float) if inter_arrivals else np.array([])
++    feats = {
++        "num_packets": float(len(arr_sizes)),
++        "total_bytes": float(arr_sizes.sum()),
++        "mean_size": float(arr_sizes.mean()),
++        "median_size": float(np.median(arr_sizes)),
++        "std_size": float(arr_sizes.std(ddof=0)),
++        "num_outgoing": float(np.sum(arr_sizes > 0)),
++        "num_incoming": float(np.sum(arr_sizes < 0)),
++    }
++    if arr_inter.size > 0:
++        feats.update({
++            "mean_inter_arrival": float(arr_inter.mean()),
++            "median_inter_arrival": float(np.median(arr_inter)),
++            "std_inter_arrival": float(arr_inter.std(ddof=0)),
++        })
++    else:
++        feats.update({
++            "mean_inter_arrival": 0.0,
++            "median_inter_arrival": 0.0,
++            "std_inter_arrival": 0.0,
++        })
++    return feats
++
++def process_dataset(dataset_dir):
++    labels = []
++    feature_dicts = []
++    for root, dirs, files in os.walk(dataset_dir):
++        rel = os.path.relpath(root, dataset_dir)
++        if rel == ".":
++            continue
++        label = os.path.basename(root)
++        for fname in sorted(files):
++            if not (fname.lower().endswith(".pcap") or fname.lower().endswith(".pcapng")):
++                continue
++            pcap_path = os.path.join(root, fname)
++            feats = extract_features_from_pcap(pcap_path)
++            if feats is None:
++                continue
++            labels.append(label)
++            feature_dicts.append(feats)
++    return labels, feature_dicts
++
++def write_csv(labels, feats, out_csv):
++    if not feats:
++        print("[error] no features extracted", file=sys.stderr)
++        return
++    fieldnames = list(sorted(feats[0].keys()))
++    os.makedirs(os.path.dirname(out_csv) or ".", exist_ok=True)
++    with open(out_csv, "w", newline="") as f:
++        writer = csv.writer(f)
++        writer.writerow(["label"] + fieldnames)
++        for label, feat in zip(labels, feats):
++            row = [label] + [feat.get(name, 0.0) for name in fieldnames]
++            writer.writerow(row)
++    print(f"[info] wrote {len(labels)} samples to {out_csv}")
++
++def main():
++    parser = argparse.ArgumentParser()
++    parser.add_argument("dataset_dir")
++    parser.add_argument("output_csv")
++    args = parser.parse_args()
++    labels, feats = process_dataset(args.dataset_dir)
++    if not labels:
++        print("[error] no PCAP files processed", file=sys.stderr)
++        sys.exit(1)
++    write_csv(labels, feats, args.output_csv)
++
++if __name__ == "__main__":
++    main()
++
+diff --git a/test_harness.sh b/test_harness.sh
+new file mode 100755
+index 0000000..d6b6c74
+--- /dev/null
++++ b/test_harness.sh
+@@
++#!/usr/bin/env bash
++#
++# test_harness.sh - simple script to exercise the Cactus PoC.
++#
++set -euo pipefail
++
++NGINX_CONTAINER_NAME="obfs-nginx"
++
++echo "[+] Starting nginx container on port 8080..."
++if docker ps -a --format '{{.Names}}' | grep -q "^${NGINX_CONTAINER_NAME}$"; then
++  docker rm -f "${NGINX_CONTAINER_NAME}" >/dev/null 2>&1 || true
++fi
++docker run -d --name "${NGINX_CONTAINER_NAME}" -p 8080:80 nginx:alpine >/dev/null
++sleep 2
++
++echo "[+] Running baseline fetch (no obfuscation)"
++sudo python3 obfuscator.py baseline 2>baseline_bpf.log | tee baseline_metrics.log
++
++echo "[+] Running obfuscation fetch (random segmentation + padding)"
++sudo python3 obfuscator.py obfuscate 2>obfs_bpf.log | tee obfuscation_metrics.log
++
++echo "[+] Tests completed.  Metrics saved to baseline_metrics.log and obfuscation_metrics.log."
++
++echo "[+] Cleaning up nginx container..."
++docker rm -f "${NGINX_CONTAINER_NAME}" >/dev/null
++
++echo "All done."
++
+diff --git a/analyzer.py b/analyzer.py
+new file mode 100755
+index 0000000..27abfd3
+--- /dev/null
++++ b/analyzer.py
+@@
++#!/usr/bin/env python3
++"""
++analyzer.py
++
++Parse relay logs produced by the C³ relays and print concise packet-size
++and inter-packet-gap statistics.
++"""
++from __future__ import annotations
++
++import argparse
++import re
++import sys
++import math
++try:
++    import numpy as np
++except Exception:
++    np = None
++
++LINE_RE = re.compile(r"client->server\s+bytes=(\d+)\s+gap=([0-9eE\+\-\.]+)")
++
++def parse_lines(lines):
++    sizes = []
++    gaps = []
++    for ln in lines:
++        m = LINE_RE.search(ln)
++        if not m:
++            continue
++        try:
++            size = int(m.group(1))
++            gap_s = float(m.group(2))
++        except Exception:
++            continue
++        sizes.append(size)
++        gaps.append(gap_s)
++    return sizes, gaps
++
++def mean_std_median(values):
++    if not values:
++        return None, None, None
++    if np is not None:
++        arr = np.array(values, dtype=float)
++        mean = float(arr.mean())
++        std = float(arr.std(ddof=0))
++        median = float(np.median(arr))
++    else:
++        n = len(values)
++        mean = sum(values) / n
++        std = math.sqrt(sum((x - mean) ** 2 for x in values) / n)
++        sortedv = sorted(values)
++        mid = n // 2
++        if n % 2 == 1:
++            median = float(sortedv[mid])
++        else:
++            median = (sortedv[mid - 1] + sortedv[mid]) / 2.0
++    return mean, std, median
++
++def human_readable_report(sizes, gaps_s):
++    total_writes = len(sizes)
++    total_bytes = sum(sizes)
++    mean_size, std_size, median_size = mean_std_median([float(s) for s in sizes]) 
++    gaps_ms = [g * 1000.0 for g in gaps_s] if gaps_s else []
++    mean_gap, std_gap, median_gap = mean_std_median(gaps_ms)
++    lines = []
++    lines.append("=== Relay Log Analysis ===")
++    lines.append(f"Total writes (client->server): {total_writes}")
++    lines.append(f"Total bytes written: {total_bytes}")
++    if mean_size is not None:
++        lines.append(f"Packet sizes (bytes): mean={mean_size:.2f}, median={median_size:.2f}, std={std_size:.2f}")
++    else:
++        lines.append("Packet sizes: n/a")
++    if gaps_ms:
++        lines.append(f"Inter-packet gaps (ms): mean={mean_gap:.3f}, median={median_gap:.3f}, std={std_gap:.3f}")
++        lines.append(f"Observed gaps count: {len(gaps_ms)} (first gap is 0 for initial write)")
++    else:
++        lines.append("Inter-packet gaps: n/a (single-segment writes only)")
++    return "\n".join(lines)
++
++def main():
++    p = argparse.ArgumentParser()
++    p.add_argument("logfile")
++    args = p.parse_args()
++    if args.logfile == "-":
++        content = sys.stdin.read().splitlines()
++    else:
++        try:
++            with open(args.logfile, "r", encoding="utf-8") as f:
++                content = f.read().splitlines()
++        except Exception as e:
++            print(f"[error] failed to open {args.logfile}: {e}", file=sys.stderr)
++            sys.exit(2)
++    sizes, gaps = parse_lines(content)
++    report = human_readable_report(sizes, gaps)
++    print(report)
++
++if __name__ == "__main__":
++    main()
++
+diff --git a/main.go b/main.go
+new file mode 100644
+index 0000000..1b23cc9
+--- /dev/null
++++ b/main.go
+@@
++package main
++
++import (
++    "fmt"
++    "io"
++    "log"
++    "net"
++    "os"
++    "time"
++)
++
++func proxy(src net.Conn, dst net.Conn, label string) {
++    defer src.Close()
++    defer dst.Close()
++    buf := make([]byte, 32*1024)
++    var last time.Time
++    for {
++        n, err := src.Read(buf)
++        if n > 0 {
++            if label == "client->server" {
++                if last.IsZero() {
++                    fmt.Printf("%s bytes=%d gap=0\n", label, n)
++                } else {
++                    gap := time.Since(last).Seconds()
++                    fmt.Printf("%s bytes=%d gap=%.6f\n", label, n, gap)
++                }
++                last = time.Now()
++            }
++            if _, err2 := dst.Write(buf[:n]); err2 != nil {
++                return
++            }
++        }
++        if err != nil {
++            if err != io.EOF {
++                log.Println("read error:", err)
++            }
++            return
++        }
++    }
++}
++
++func handleConnection(client net.Conn, destAddr string) {
++    server, err := net.Dial("tcp", destAddr)
++    if err != nil {
++        log.Println("error connecting to", destAddr, ":", err)
++        client.Close()
++        return
++    }
++    go proxy(client, server, "client->server")
++    proxy(server, client, "server->client")
++}
++
++func main() {
++    listenPort := os.Getenv("LISTEN_PORT")
++    if listenPort == "" {
++        listenPort = "9001"
++    }
++    dest := os.Getenv("DEST_ADDR")
++    if dest == "" {
++        dest = "localhost:80"
++    }
++    ln, err := net.Listen("tcp", ":"+listenPort)
++    if err != nil {
++        log.Fatal(err)
++    }
++    log.Printf("relay listening on :%s forwarding to %s\n", listenPort, dest)
++    for {
++        conn, err := ln.Accept()
++        if err != nil {
++            log.Println(err)
++            continue
++        }
++        go handleConnection(conn, dest)
++    }
++}
++
+diff --git a/README.md b/README.md
+new file mode 100644
+index 0000000..53cb6aa
+--- /dev/null
++++ b/README.md
+@@
++# Cactus PoC – Client-side Obfuscation with eBPF
++
++This repository contains a minimal, runnable proof-of-concept for client-side
++obfuscation (Cactus-style) and a small C³ demo harness for website-fingerprinting
++experiments. See test_harness.sh and demo.sh for runnable examples.
++
++Requirements and usage are in the repo — run `chmod +x *.sh` and follow the
++scripts. BPF functionality requires root privileges and the `python3-bcc` system
++package on Debian/Ubuntu.
++
+diff --git a/requirements.txt b/requirements.txt
+new file mode 100644
+index 0000000..a1b2c3d
+--- /dev/null
++++ b/requirements.txt
+@@
++# Python runtime requirements for C³ / Cactus PoC (pip format)
++numpy>=1.21
++pandas>=1.3
++scikit-learn>=1.0
++matplotlib>=3.3
++scapy>=2.4.5
++# Optional: Python bindings for BPF. On Debian/Ubuntu install system package:
++# sudo apt install python3-bcc
++bcc>=0.19.0
+diff --git a/.dockerignore b/.dockerignore
+new file mode 100644
+index 0000000..b4d3f2a
+--- /dev/null
++++ b/.dockerignore
+@@
++# .dockerignore — keep Docker build context small
++
++# Python
++__pycache__/
++*.pyc
++env/
++venv/
++.venv/
++pip-wheel-metadata/
++*.egg-info/
++dist/
++build/
++
++# Virtual envs / caches
++.python-version
++.pytest_cache/
++.mypy_cache/
++.cache/
++.ipynb_checkpoints/
++
++# Editor/IDE
++.vscode/
++.idea/
++
++# OS
++.DS_Store
++Thumbs.db
++
++# Logs, artifacts, large outputs
++*.log
++baseline_bpf.log
++obfs_bpf.log
++baseline_metrics.log
++obfuscation_metrics.log
++evaluation/
++
++# Containers / images
++docker-compose.override.yml
++.docker/
