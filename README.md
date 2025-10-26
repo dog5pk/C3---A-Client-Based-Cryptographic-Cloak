@@ -45,6 +45,10 @@ After it completes, it prints a summary and writes detailed results to `summary.
 
 This shows how obfuscation changes latency and size distributions.
 
+## Demo in One Command
+
+To orchestrate the entire demo – stopping any existing run, starting the stub services, running both baseline and obfuscated simulations, writing a consolidated `summary.json` plus the usual summaries and plot, printing a concise summary and cleaning up – use the `demo_full.sh` script. For example:
+
 ## What’s Here
 - **Demo harness**: `demo.sh`, `run_local.sh`, `stop_local.sh`, `start_chain.sh`, `stop_chain.sh`
 - **Runtime**: `logs/`, `pids/`, `artifacts/` (git-ignored)
