@@ -1,0 +1,67 @@
+# .dockerignore — keep Docker build context small
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+env/
+venv/
+.venv/
+pip-wheel-metadata/
+*.egg-info/
+dist/
+build/
+
+# Virtual envs / caches
+.python-version
+.pytest_cache/
+.mypy_cache/
+.cache/
+.ipynb_checkpoints/
+
+# Editor/IDE
+.vscode/
+.idea/
+*.sublime-workspace
+*.sublime-project
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Git / repo metadata
+.git
+.gitignore
+.gitattributes
+
+# Logs, artifacts, large outputs
+*.log
+baseline_bpf.log
+obfs_bpf.log
+baseline_metrics.log
+obfuscation_metrics.log
+evaluation/
+*.sqlite3
+
+# Containers / images
+docker-compose.override.yml
+.docker/
+
+# Node / front-end
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Build artifacts, binaries
+*.exe
+*.dll
+*.so
+*.dylib
+*.o
+*.a
+*.class
+
+# Temporary files
+*.swp
+*~ 
