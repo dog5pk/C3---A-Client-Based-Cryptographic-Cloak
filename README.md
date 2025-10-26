@@ -20,6 +20,11 @@ Stop:
 - Prints a 6-line summary on stdout
 - No binaries start yet; this is a safe placeholder while M6 is implemented
 
+## Results (Example)
+
+Run the full demo with a specific preset and duration:
+
+
 ## What’s Here
 - **Demo harness**: `demo.sh`, `run_local.sh`, `stop_local.sh`, `start_chain.sh`, `stop_chain.sh`
 - **Runtime**: `logs/`, `pids/`, `artifacts/` (git-ignored)
