@@ -22,8 +22,28 @@ Stop:
 
 ## Results (Example)
 
-Run the full demo with a specific preset and duration:
+To run the full demo, use:
+  chmod +x demo.sh && ./demo.sh --preset med --duration 10
 
+After it completes, it prints a summary and writes detailed results to `summary.txt` in the artifacts directory. A sample summary looks like:
+
+- preset=med
+- duration_s=10
+- req_total_baseline=100
+- req_total_obfuscated=100
+- baseline_p50_ms=34.23
+- baseline_p95_ms=151.29
+- obfuscated_p50_ms=64.29
+- obfuscated_p95_ms=181.59
+- baseline_bytes_in=72509
+- baseline_bytes_out=72509
+- obfuscated_bytes_in=69888
+- obfuscated_bytes_out=69888
+- status=OK
+- artifacts=artifacts/&lt;timestamp&gt;
+
+
+This shows how obfuscation changes latency and size distributions.
 
 ## What’s Here
 - **Demo harness**: `demo.sh`, `run_local.sh`, `stop_local.sh`, `start_chain.sh`, `stop_chain.sh`
