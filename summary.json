@@ -1,0 +1,18 @@
+{
+  "baseline": {
+    "size_bytes_mean": 658.1925,
+    "size_bytes_std": 388.7224228221886,
+    "gap_ms_median": 33.11439327112171,
+    "gap_ms_p95": 89.4273419760488
+  },
+  "obfuscate": {
+    "size_bytes_mean": 572.271,
+    "size_bytes_std": 80.37582780816582,
+    "gap_ms_median": 20.176526033560016,
+    "gap_ms_p95": 33.86408038590346
+  },
+  "divergence": {
+    "size_bytes_js_divergence": 0.5314720586655638,
+    "gap_ms_js_divergence": 0.1732186898747614
+  }
+}
