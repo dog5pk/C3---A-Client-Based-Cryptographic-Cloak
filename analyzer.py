@@ -74,7 +74,7 @@ def generate_plot(baseline: Dict[str, Any], obfuscated: Optional[Dict[str, Any]]
     if sizes_base:
         ax1.hist(sizes_base, bins=30, alpha=0.6, label='baseline', color='tab:blue')
     if sizes_obf:
-        ax1.hist(sizes_obf, bins=30, alpha 0.6, label='obfuscated', color='tab:orange')
+        ax1.hist(sizes_obf, bins=30, alpha=0.6, label='obfuscated', color='tab:orange')
     ax1.set_title('Packet size distribution')
     ax1.set_xlabel('bytes')
     ax1.set_ylabel('count')
