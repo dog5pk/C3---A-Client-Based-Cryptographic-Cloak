@@ -1,0 +1,20 @@
+name: codex
+on:
+  push: { branches: [ main, investor-box ] }
+  pull_request: { branches: [ main, investor-box ] }
+  workflow_dispatch: {}
+jobs:
+  run-codex:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: chmod +x tools/codex/codex.sh
+      - name: Run Codex
+        run: tools/codex/codex.sh
+      - name: Archive Codex report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: codex-report
+          path: tools/codex/report.json
+          if-no-files-found: error
