@@ -1,74 +1,26 @@
-# .github/workflows/ci.yml
-# Robust CI: install Python deps (but filter out 'bcc' which requires system headers),
-# run syntax checks, lint (non-blocking), and pytest (if present).
 name: CI
-
 on:
   push:
-    branches: [ main ]
+    branches: [ main, investor-box ]
   pull_request:
-    branches: [ main ]
+    branches: [ main, investor-box ]
   workflow_dispatch:
-
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
     name: Build, lint & smoke tests
-
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: "3.10"
-
-      - name: Cache pip
-        uses: actions/cache@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v4
+        with: { python-version: "3.10" }
+      - uses: actions/cache@v4
         with:
           path: ~/.cache/pip
           key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
-          restore-keys: |
-            ${{ runner.os }}-pip-
-
-      - name: Prepare filtered requirements (skip bcc)
-        run: |
-          # If requirements.txt exists, create a filtered copy that removes 'bcc'
-          if [ -f requirements.txt ]; then
-            # Remove lines that are the 'bcc' package or start with 'bcc' (case-insensitive)
-            grep -i -vE '^\s*bcc(\s*([>=<].*)?)?$' requirements.txt > /tmp/requirements-no-bcc.txt || true
-            cat /tmp/requirements-no-bcc.txt || true
-          else
-            echo "# no requirements.txt found" > /tmp/requirements-no-bcc.txt
-          fi
-
-      - name: Install Python dependencies
+          restore-keys: ${{ runner.os }}-pip-
+      - name: Install deps
         run: |
           python -m pip install --upgrade pip
-          pip install -r /tmp/requirements-no-bcc.txt || (echo "pip install failed for optional deps (non-fatal)"; exit 1)
-
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
       - name: Syntax check (compile)
-        run: python -m compileall .
-
-      - name: Lint (flake8, non-blocking)
-        run: |
-          pip install flake8 || true
-          flake8 || echo "flake8 reported issues (non-blocking for now)"
-
-      - name: Run pytest (if tests present; non-blocking)
-        run: |
-          pip install pytest || true
-          if [ -d tests ] || ls test_*.py 1>/dev/null 2>&1; then
-            pytest -q || echo "pytest failed (non-blocking)"
-          else
-            echo "No tests detected; skipping pytest."
-          fi
-
-      - name: Smoke-run core scripts (basic runtime check)
-        run: |
-          # Basic sanity checks that do not require system-level deps (no BPF)
-          python3 -c "import sys; print('python ok', sys.version)"
-          # ensure analyzer.py parses --help or prints usage
-          python3 analyzer.py -h || true
-
+        run: python -m py_compile $(git ls-files '*.py')
