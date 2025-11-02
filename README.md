@@ -63,3 +63,6 @@ Contact: **Dog5pkPrrsents@proton.me**
 
 ## License
 MIT — see `LICENSE`.
+
+## CI
+![CI](https://github.com/${GITHUB_REPOSITORY:-owner/repo}/actions/workflows/selftest.yml/badge.svg "D-Bridge CI Selftest")
