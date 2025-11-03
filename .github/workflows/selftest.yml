@@ -19,7 +19,7 @@ jobs:
         with:
           python-version: '3.x'
 
-      - name: System build deps (for cryptography builds)
+      - name: System build deps
         run: |
           set -euxo pipefail
           sudo apt-get update -y
