@@ -1,24 +1,17 @@
-# Python
 __pycache__/
 *.pyc
-client/.venv/
 .venv/
-
-# Local artifacts
-dbridge_release_*.tar.gz
-dbridge_release_*.tar.gz.sha256
-ci_artifacts/
-dbridge_replay.sqlite
-.relay_pids
-
-# Client outputs
+client/.venv/
 client/*.bin
 client/received_output.bin
 client/final_obfuscated_output.bin
 client/relay_output_*.bin
 client/e2e_test.txt
 client/secrets.json
-
-# OS/editor
+dbridge_release_*.tar.gz
+dbridge_release_*.tar.gz.sha256
+ci_artifacts/
+dbridge_replay.sqlite
+.relay_pids
 .DS_Store
 *.swp
