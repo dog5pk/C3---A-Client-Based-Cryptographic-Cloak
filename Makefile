@@ -1,32 +1,17 @@
-# D-Bridge Makefile
-# Canonical ship flow: selftest -> pack -> verify
+# C³ Makefile — light wrappers for the stubs (safe anywhere)
+.PHONY: demo run stop analyze
 
-SHELL := /usr/bin/env bash
-ROOT  := $(shell pwd)
-VERSION ?= $(shell git describe --tags --abbrev=0 2>/dev/null || date +%Y%m%d)
+demo:
+	chmod +x demo.sh
+	./demo.sh --preset low --duration 10
 
-.PHONY: health selftest pack verify clean restart demo_systemd demo_spawn
+run:
+	chmod +x run_local.sh
+	./run_local.sh
 
-health:
-	@./scripts/check_health.sh
+stop:
+	chmod +x stop_local.sh
+	./stop_local.sh
 
-selftest:
-	@./scripts/selftest.sh
-
-pack:
-	@VERSION=$(VERSION) ./scripts/pack_release.sh
-
-verify:
-	@./scripts/verify_release.sh V01.01 || ./scripts/verify_release.sh
-
-clean:
-	@./scripts/clean_demo.sh || true
-
-restart:
-	@./scripts/restart_relays.sh || true
-
-demo_systemd:
-	@./scripts/demo_systemd.sh
-
-demo_spawn:
-	@./scripts/demo_spawn.sh
+analyze:
+	python3 analyzer.py || true
