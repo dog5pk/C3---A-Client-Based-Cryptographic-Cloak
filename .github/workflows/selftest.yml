@@ -19,11 +19,11 @@ jobs:
         with:
           python-version: '3.x'
 
-      - name: System deps (curl, lsof, build-essential, python3-dev)
+      - name: System build deps
         run: |
           set -euxo pipefail
           sudo apt-get update -y
-          sudo apt-get install -y curl lsof build-essential python3-dev
+          sudo apt-get install -y build-essential python3-dev
 
       - name: CI selftest (traced)
         run: |
