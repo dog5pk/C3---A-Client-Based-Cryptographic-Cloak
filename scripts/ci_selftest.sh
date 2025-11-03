@@ -1,41 +1,40 @@
 #!/usr/bin/env bash
+# CI-safe E2E: spawn relays (no systemd), run hash-equality self-test.
 set -euo pipefail
+
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+CLIENT="$ROOT/client"
+RELAYS="$ROOT/relays"
+CHAIN="127.0.0.1:9000,127.0.0.1:9001,127.0.0.1:9002"
 
-# Build & spawn 3 relays locally (health on 19000..19002)
-cd "$ROOT/relays"
-[ -x ./relay ] || go build -o relay relay.go
-./relay --host=127.0.0.1 --port=9000 --health-addr=127.0.0.1:19000 & P1=$!
-./relay --host=127.0.0.1 --port=9001 --health-addr=127.0.0.1:19001 & P2=$!
-./relay --host=127.0.0.1 --port=9002 --health-addr=127.0.0.1:19002 & P3=$!
-trap 'kill -9 $P1 $P2 $P3 2>/dev/null || true' EXIT
-sleep 1
-for hp in 19000 19001 19002; do curl -fsS "http://127.0.0.1:${hp}/healthz" >/dev/null; done
+# Build relay
+(cd "$RELAYS" && go build -o relay relay.go)
 
-# Client E2E in its own venv
-cd "$ROOT/client"
-python3 -m venv .venv
+# Python env
+cd "$CLIENT"
+python3 -m venv .venv >/dev/null 2>&1 || true
 . .venv/bin/activate
-python -m pip install -U pip
-# cryptography needs build toolchain sometimes; the runner has them after workflow step
-pip install "cryptography>=41,<43"
+pip install --disable-pip-version-check -q cryptography
 
-# Secrets (local to CI)
-[ -f secrets.json ] || python - <<'PY'
-import json, secrets, pathlib
+# Fresh local secret
+python3 - <<'PY'
+import json,secrets,pathlib
 pathlib.Path("secrets.json").write_text(json.dumps({"root_secret": secrets.token_hex(32)}, indent=2))
 print("secrets.json generated")
 PY
 
-CHAIN="127.0.0.1:9000,127.0.0.1:9001,127.0.0.1:9002"
-PAD=512
-MTU=700
+# Payload
+echo "ci selftest" > ci_selftest.txt
 
-echo "CI selftest payload" > e2e_test.txt
-python3 dbridge.py --tcp --chain "$CHAIN" --secrets secrets.json --pad $PAD --mtu $MTU sendfile e2e_test.txt
-python3 dbridge.py --tcp --chain "$CHAIN" --mtu $MTU forward final_obfuscated_output.bin
-python3 dbridge.py --tcp --chain "$CHAIN" --secrets secrets.json --pad $PAD --mtu $MTU --replay-db ../dbridge_replay.sqlite receive relay_output_3.bin
+# Send → Forward → Receive (spawn relays each call)
+python3 dbridge.py --tcp --spawn-relays --relay-bin ../relays/relay \
+  --chain "$CHAIN" --secrets secrets.json --pad 512 --mtu 700 sendfile ci_selftest.txt
 
-cmp -s e2e_test.txt received_output.bin
-echo "[OK] CI selftest passed"
-deactivate
+python3 dbridge.py --tcp --spawn-relays --relay-bin ../relays/relay \
+  --chain "$CHAIN" --mtu 700 forward final_obfuscated_output.bin
+
+python3 dbridge.py --tcp --spawn-relays --relay-bin ../relays/relay \
+  --chain "$CHAIN" --secrets secrets.json --pad 512 --replay-db ../dbridge_replay.sqlite --mtu 700 receive relay_output_3.bin
+
+# Verify
+diff -q ci_selftest.txt received_output.bin && echo "[CI] selftest passed ✅"
