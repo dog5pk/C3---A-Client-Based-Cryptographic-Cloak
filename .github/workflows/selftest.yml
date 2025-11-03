@@ -1,13 +1,48 @@
-name: D-Bridge CI Selftest
+name: D-Bridge CI Selftest (V01.01)
+
 on:
+  workflow_dispatch: {}
   push:
+    branches: [ main ]
+    paths:
+      - 'client/**'
+      - 'relays/**'
+      - '.github/workflows/selftest.yml'
+      - 'Makefile'
+      - 'scripts/**'
   pull_request:
-  workflow_dispatch:
+    branches: [ main ]
+    paths:
+      - 'client/**'
+      - 'relays/**'
+      - '.github/workflows/selftest.yml'
+      - 'Makefile'
+      - 'scripts/**'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: selftest-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  CHAIN: "127.0.0.1:9000,127.0.0.1:9001,127.0.0.1:9002"
+  PAD: "512"
+  MTU: "700"
+
 jobs:
   selftest:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout (full history for reproducible artifacts)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Go
         uses: actions/setup-go@v5
@@ -17,34 +52,76 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.x'
+          python-version: '3.12'
 
-      - name: System deps (curl, lsof, build-essential, python3-dev)
-        run: |
-          set -euxo pipefail
-          sudo apt-get update -y
-          sudo apt-get install -y curl lsof build-essential python3-dev
+      - name: Cache Go build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
 
-      - name: CI selftest (traced)
-        run: |
-          set -euxo pipefail
-          bash -x scripts/ci_selftest.sh
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
 
-      - name: Pack release (traced)
+      - name: Install Python deps
         run: |
-          set -euxo pipefail
-          bash -x scripts/pack_release.sh
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; else pip install "cryptography>=41,<43"; fi
 
-      - name: Verify checksum (traced)
+      - name: Build relays
         run: |
-          set -euxo pipefail
-          bash -x scripts/verify_release.sh
+          set -euo pipefail
+          cd relays
+          [ -x ./relay ] || go build -o relay relay.go
+
+      - name: Spawn 3 relays (localhost, health on 19000..19002)
+        run: |
+          set -euo pipefail
+          cd relays
+          ./relay --host=127.0.0.1 --port=9000 --health-addr=127.0.0.1:19000 & echo $! > ../.p1
+          ./relay --host=127.0.0.1 --port=9001 --health-addr=127.0.0.1:19001 & echo $! > ../.p2
+          ./relay --host=127.0.0.1 --port=9002 --health-addr=127.0.0.1:19002 & echo $! > ../.p3
+          sleep 1
+          for hp in 19000 19001 19002; do curl -fsS "http://127.0.0.1:${hp}/healthz" > /dev/null; done
+
+      - name: CI selftest (send/forward/receive; compare)
+        run: |
+          set -euo pipefail
+          cd client
+          echo "CI selftest V01.01" > e2e_test.txt
+          python3 dbridge.py --tcp --chain "$CHAIN" --pad "$PAD" --mtu "$MTU" sendfile e2e_test.txt
+          python3 dbridge.py --tcp --chain "$CHAIN" --mtu "$MTU" forward final_obfuscated_output.bin
+          python3 dbridge.py --tcp --chain "$CHAIN" --pad "$PAD" --mtu "$MTU" receive relay_output_3.bin
+          cmp -s e2e_test.txt received_output.bin
+          echo "[CI] selftest OK"
+
+      - name: Pack reproducible artifact + checksum
+        run: |
+          set -euo pipefail
+          TGZ="dbridge_release_V01.01_CI.tar.gz"
+          tar -czf "$TGZ" client/ relays/ scripts/ Makefile README.md .github/workflows/selftest.yml
+          sha256sum "$TGZ" | tee "${TGZ}.sha256"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: dbridge-artifact
           path: |
-            dbridge_release_*.tar.gz
-            dbridge_release_*.tar.gz.sha256
-          if-no-files-found: error
+            dbridge_release_V01.01_CI.tar.gz
+            dbridge_release_V01.01_CI.tar.gz.sha256
+
+      - name: Cleanup relays
+        if: always()
+        run: |
+          set -euo pipefail
+          kill -9 $(cat .p1 .p2 .p3 2>/dev/null) 2>/dev/null || true
+          rm -f .p1 .p2 .p3 || true

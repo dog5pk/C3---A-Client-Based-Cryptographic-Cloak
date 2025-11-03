@@ -75,3 +75,6 @@ Contents: report.html, ONE_PAGER.md, pilot_brief.md, logs/*.csv, plots/*.png, su
 =======
 # Git Test
 343e6f1 (test: initial commit)
+
+## CI
+[![D-Bridge CI Selftest (V01.01)](https://github.com/dog5pk/C3---A-Client-Based-Cryptographic-Cloak/actions/workflows/selftest.yml/badge.svg)](https://github.com/dog5pk/C3---A-Client-Based-Cryptographic-Cloak/actions/workflows/selftest.yml)
