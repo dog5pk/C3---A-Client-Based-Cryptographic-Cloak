@@ -3,9 +3,9 @@ name: D-Bridge CI Selftest
 on:
   push:
   pull_request:
-  workflow_dispatch:
+  workflow_dispatch:       # <— enables manual runs
   schedule:
-    - cron: "30 3 * * *"  # nightly @ 03:30 UTC
+    - cron: "30 3 * * *"   # nightly @ 03:30 UTC
 
 jobs:
   selftest:
