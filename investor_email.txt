@@ -1,0 +1,9 @@
+Subject: C³ — client-side cryptographic cloak (seed $5.5M; pilot proposal)
+
+Hi <Name> — I’m building C³, a client-side cryptographic cloak that makes outbound traffic look like entropy.
+Prototype and repo are live. I’ve attached a one-pager and a single-file demo report (no setup needed).
+
+If this fits your privacy/security thesis, could we do a 15-minute call to scope a two‑week pilot?
+— Kevin “Dog5pk” Richardson
+<email> · Grand Island, NY
+Links: <repo> · report.html · ONE_PAGER.md · pilot_brief.md

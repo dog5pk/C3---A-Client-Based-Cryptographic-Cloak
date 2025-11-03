@@ -1,3 +1,4 @@
+ci-wireup
 # C³ — Client-based Cryptographic Cloak (Demo)
 
 C³ reshapes and reroutes traffic **on the client** to blunt AI-driven traffic analysis.  
@@ -66,3 +67,11 @@ MIT — see `LICENSE`.
 
 ## CI
 ![CI](https://github.com/${GITHUB_REPOSITORY:-owner/repo}/actions/workflows/selftest.yml/badge.svg "D-Bridge CI Selftest")
+=======
+HEAD
+# C³ Investor Box
+This folder is a drop‑in, investor‑ready snapshot. Open `report.html` in a browser.
+Contents: report.html, ONE_PAGER.md, pilot_brief.md, logs/*.csv, plots/*.png, summary.json, analyze.py, run_demo.sh
+=======
+# Git Test
+343e6f1 (test: initial commit)
