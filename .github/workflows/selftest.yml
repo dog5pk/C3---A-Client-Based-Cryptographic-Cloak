@@ -3,9 +3,6 @@ name: D-Bridge CI Selftest
 on:
   push:
   pull_request:
-  workflow_dispatch:
-  schedule:
-    - cron: "30 3 * * *"  # nightly @ 03:30 UTC
 
 jobs:
   selftest:
@@ -37,24 +34,6 @@ jobs:
         run: |
           bash scripts/pack_release.sh
 
-      - name: Verify checksum (explicit)
+      - name: Verify checksum
         run: |
           bash scripts/verify_release.sh || true
-
-      - name: Find latest tarball
-        id: find_tgz
-        shell: bash
-        run: |
-          TGZ="$(ls -1t dbridge_release_*.tar.gz 2>/dev/null | head -n1 || true)"
-          echo "tgz=${TGZ}" >> "$GITHUB_OUTPUT"
-          echo "sha=${TGZ}.sha256" >> "$GITHUB_OUTPUT"
-
-      - name: Upload release artifact
-        if: steps.find_tgz.outputs.tgz != ''
-        uses: actions/upload-artifact@v4
-        with:
-          name: dbridge-artifact
-          path: |
-            ${{ steps.find_tgz.outputs.tgz }}
-            ${{ steps.find_tgz.outputs.sha }}
-          if-no-files-found: error
