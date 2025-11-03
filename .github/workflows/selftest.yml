@@ -1,45 +1,60 @@
 name: D-Bridge CI Selftest
+
 on:
   push:
   pull_request:
-  workflow_dispatch:
+  workflow_dispatch:       # <— enables manual runs
   schedule:
-    - cron: "30 3 * * *"
+    - cron: "30 3 * * *"   # nightly @ 03:30 UTC
+
 jobs:
   selftest:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
       - name: Setup Go
         uses: actions/setup-go@v5
-        with: { go-version: '1.22.x' }
+        with:
+          go-version: '1.22.x'
+
       - name: Setup Python
         uses: actions/setup-python@v5
-        with: { python-version: '3.x' }
+        with:
+          python-version: '3.x'
+
       - name: Install Python deps
         run: |
-          set -euxo pipefail
           python -m pip install --upgrade pip
           pip install cryptography
-      - name: CI selftest (spawn relays, traced)
+
+      - name: CI selftest (spawn relays)
         run: |
-          set -euxo pipefail
-          bash -x scripts/ci_selftest.sh
-      - name: Pack release (traced)
+          bash scripts/ci_selftest.sh
+
+      - name: Pack release
         run: |
-          set -euxo pipefail
-          bash -x scripts/pack_release.sh
+          bash scripts/pack_release.sh
+
       - name: Verify checksum (explicit)
         run: |
-          set -euxo pipefail
-          bash -x scripts/verify_release.sh || true
-      - name: Upload artifact
-        if: always()
+          bash scripts/verify_release.sh || true
+
+      - name: Find latest tarball
+        id: find_tgz
+        shell: bash
+        run: |
+          TGZ="$(ls -1t dbridge_release_*.tar.gz 2>/dev/null | head -n1 || true)"
+          echo "tgz=${TGZ}" >> "$GITHUB_OUTPUT"
+          echo "sha=${TGZ}.sha256" >> "$GITHUB_OUTPUT"
+
+      - name: Upload release artifact
+        if: steps.find_tgz.outputs.tgz != ''
         uses: actions/upload-artifact@v4
         with:
           name: dbridge-artifact
           path: |
-            dbridge_release_*.tar.gz
-            dbridge_release_*.tar.gz.sha256
-          if-no-files-found: warn
+            ${{ steps.find_tgz.outputs.tgz }}
+            ${{ steps.find_tgz.outputs.sha }}
+          if-no-files-found: error
