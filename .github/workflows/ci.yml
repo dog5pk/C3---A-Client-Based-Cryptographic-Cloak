@@ -1,0 +1,127 @@
+name: D-Bridge CI Pipeline
+
+on:
+  push:
+    branches: [ main, develop, release/* ]
+  pull_request:
+    branches: [ main, develop ]
+
+permissions:
+  contents: read
+  actions: read
+  checks: write
+  security-events: write
+
+env:
+  GO_VERSION: "1.22.5"
+  CGO_ENABLED: 0
+
+jobs:
+  lint:
+    name: Lint and Static Analysis
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Install linters
+        run: |
+          go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.60.3
+          go install github.com/securego/gosec/v2/cmd/gosec@v2.19.0
+
+      - name: Run golangci-lint
+        run: golangci-lint run --timeout 3m ./...
+
+      - name: Run gosec
+        run: gosec ./...
+
+  test:
+    name: Unit and Integration Tests
+    runs-on: ubuntu-24.04
+    needs: lint
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Tidy modules
+        run: go mod tidy
+
+      - name: Run unit tests with coverage
+        run: |
+          mkdir -p artifacts
+          go test -v -covermode=count -coverprofile=artifacts/coverage.out ./...
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: artifacts/coverage.out
+
+  build:
+    name: Deterministic Build
+    runs-on: ubuntu-24.04
+    needs: test
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Build binaries deterministically
+        run: |
+          mkdir -p bin artifacts
+          go build -trimpath -buildvcs=false -ldflags="-s -w -buildid=" -o bin/relay ./cmd/relay
+          sha256sum bin/relay > artifacts/SHA256SUMS
+          echo "Build completed deterministically"
+
+      - name: Upload binaries and hashes
+        uses: actions/upload-artifact@v4
+        with:
+          name: relay-binaries
+          path: |
+            bin/relay
+            artifacts/SHA256SUMS
+
+  container:
+    name: Container Build (Distroless)
+    runs-on: ubuntu-24.04
+    needs: build
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and validate container
+        run: |
+          docker build --no-cache --pull --platform linux/amd64 -t dbridge:test -f Dockerfile .
+          docker save dbridge:test | sha256sum > artifacts/docker_image_hash.txt
+
+      - name: Upload container artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: container-image
+          path: artifacts/docker_image_hash.txt
+
+  policy:
+    name: CI Policy Gate
+    runs-on: ubuntu-24.04
+    needs: [ lint, test, build, container ]
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: Check that all required jobs passed
+        run: echo "All CI stages passed — merge allowed."

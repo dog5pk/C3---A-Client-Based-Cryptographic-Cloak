@@ -1,0 +1,8 @@
+D-Bridge Build Provenance
+=========================
+Version: v2025.11.04-1208
+Date: Tue Nov  4 17:08:04 UTC 2025
+Go Version: go version go1.24.9 linux/amd64
+Git Commit: none
+SHA256: 1bb47f4cdfe884c10ec5e0b95f0cdced4137c0acef3725379dc2e34d15dbc44a
+Build Flags: -trimpath -buildvcs=false -ldflags="-s -w -buildid="
