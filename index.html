@@ -1,77 +1,175 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <title>C³ — The Client-Based Cryptographic Cloak</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>C³ — The Client-Based Cryptographic Cloak | Dog5pk Presents</title>
+
   <style>
-    body {
-      font-family: Arial, sans-serif;
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      background-color: #000;
+      color: #ddd;
+      font-family: "Segoe UI", Roboto, sans-serif;
+      overflow-x: hidden;
+    }
+
+    /* Dog5pk emblem as full-bleed background */
+    body::before {
+      content: "";
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: url("ChatGPT Image Nov 5, 2025, 03_55_01 AM.png") no-repeat center center fixed;
+      background-size: cover;
+      opacity: 0.7;
+      z-index: -1;
+    }
+
+    header {
       text-align: center;
-      margin: 10% auto;
-      max-width: 600px;
-      line-height: 1.4;
+      padding: 6vh 2vw 3vh;
     }
-    h1 {
-      font-size: 1.8rem;
-      font-weight: bold;
-      margin-bottom: 0.5rem;
+
+    header h1 {
+      font-size: 3em;
+      font-weight: 600;
+      color: #e0e0e0;
+      text-shadow: 0 0 10px #0077ff, 0 0 20px #0077ff33;
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
     }
-    p.tagline {
-      font-size: 1rem;
-      font-weight: normal;
-      margin-bottom: 2rem;
+
+    header img {
+      height: 60px;
+      width: auto;
+      vertical-align: middle;
     }
-    .link-block {
-      margin: 1rem 0;
+
+    .tagline {
+      font-size: 1.2em;
+      color: #aaa;
+      margin-top: 0.5em;
+      letter-spacing: 0.05em;
     }
-    .link-block a {
-      font-weight: bold;
-      text-decoration: none;
-      border: 2px solid #000;
-      border-radius: 8px;
-      padding: 10px 16px;
-      display: inline-block;
-      color: #000;
+
+    main {
+      max-width: 900px;
+      margin: auto;
+      background: rgba(10, 10, 10, 0.75);
+      padding: 40px;
+      border-radius: 12px;
+      box-shadow: 0 0 40px #000 inset;
     }
+
+    section {
+      margin-bottom: 2em;
+    }
+
+    section h2 {
+      color: #00aaff;
+      text-shadow: 0 0 8px #00aaff66;
+      border-bottom: 1px solid #111;
+      padding-bottom: 0.3em;
+    }
+
+    p {
+      line-height: 1.6;
+      font-size: 1.05em;
+      color: #d0d0d0;
+    }
+
+    .highlight {
+      font-style: italic;
+      color: #fff;
+      text-shadow: 0 0 6px #00ccff66;
+    }
+
     footer {
-      margin-top: 3rem;
-      font-size: 0.8rem;
-      color: #000;
+      text-align: center;
+      font-size: 0.9em;
+      color: #999;
+      padding: 40px 0 20px;
+    }
+
+    footer a {
+      color: #66b2ff;
+      text-decoration: none;
+    }
+
+    footer a:hover {
+      text-decoration: underline;
     }
   </style>
 </head>
+
 <body>
+  <header>
+    <h1>
+      <img src="ChatGPT Image Nov 5, 2025, 03_28_50 AM.png" alt="C³ emblem" />
+      C³ — The Client-Based Cryptographic Cloak
+    </h1>
+    <div class="tagline">Privacy by design. Sovereignty by default.</div>
+    <div>
+      <a href="https://github.com/Dog5pk/C3---A-Client-Based-Cryptographic-Cloak/actions/workflows/sanity.yml">
+        <img src="https://github.com/Dog5pk/C3---A-Client-Based-Cryptographic-Cloak/actions/workflows/sanity.yml/badge.svg"
+             alt="Verified by Dog5pk badge" />
+      </a>
+    </div>
+  </header>
 
-  <h1>C³ — The Client-Based Cryptographic Cloak</h1>
+  <main>
+    <section>
+      <p>
+        C³ is a client-side privacy architecture that neutralizes surveillance at its origin point.  
+        Instead of hiding traffic behind another service, it transforms the data itself — reshaping packets,
+        timing, and patterns so meaning can’t be derived.
+      </p>
+      <p><span class="highlight">“C³ is not a participant in the privacy market; it is its conclusion.”</span></p>
+      <p>
+        It doesn’t compete with VPNs, blockchains, or privacy networks — it renders them unnecessary.
+      </p>
+    </section>
 
-  <p class="tagline">
-    A new standard for privacy is on the horizon.<br/>
-    Step forward or step aside.
-  </p>
+    <section>
+      <h2>Why It Matters</h2>
+      <p>
+        Privacy is no longer a feature — it’s the frontier.  
+        Every existing tool still asks users to trust an intermediary, creating a permanent point of failure.  
+        C³ removes that dependency by moving the cryptographic perimeter to the client itself.
+      </p>
+      <p>
+        When observation becomes impossible, control collapses.  
+        That’s not competition with the privacy market — it’s its conclusion.
+      </p>
+    </section>
 
-  <div class="link-block">
-    <a href="C3_Whitepaper.pdf">📄 Whitepaper (PDF)</a>
-  </div>
-
-  <div class="link-block">
-    <a href="report.html">▶ Demo Report</a>
-  </div>
-
-  <div class="link-block">
-    <a href="one_pager.html">One-Pager</a>
-  </div>
-
-  <div class="link-block">
-    <a href="pilot_brief.html">Pilot Brief</a>
-  </div>
-
-  <div class="link-block">
-    <a href="contact.html">Contact</a>
-  </div>
+    <section>
+      <h2>For Investors</h2>
+      <p>
+        C³ represents the next evolution of network privacy — not a service, but a standard.  
+        Its client-based architecture transforms how encryption is applied and where trust begins,
+        positioning it to redefine the $200B+ global cybersecurity market.
+      </p>
+      <p>
+        The early focus is on licensing, infrastructure integration, and developer adoption under the
+        <strong>Dog5pk Presents</strong> umbrella — establishing a foundation for long-term, decentralized value.  
+        Funding accelerates productization, research expansion, and the rollout of the D-Bridge relay layer as
+        a live demonstrator of C³’s applied principles.
+      </p>
+    </section>
+  </main>
 
   <footer>
-    Dog5pk Presents C³
+    <p>© 2025 <strong>Dog5pk Presents</strong> ·
+      <a href="mailto:Dog5pkPrrsents@proton.me">Dog5pkPrrsents@proton.me</a> ·
+      <a href="https://github.com/Dog5pk">GitHub</a>
+    </p>
   </footer>
-
 </body>
 </html>
