@@ -1,0 +1,19 @@
+{
+  "meta": {
+    "last_updated": "unknown",
+    "source": "adaptive_trend_summary",
+    "stealth_confidence": 0.0
+  },
+  "padding": {
+    "max": 16
+  },
+  "profile_name": "adaptive-snapshot",
+  "segment": {
+    "max": 64,
+    "min": 16
+  },
+  "timing": {
+    "max_delay_ms": 5.0
+  },
+  "version": "c3-policy-v1"
+}

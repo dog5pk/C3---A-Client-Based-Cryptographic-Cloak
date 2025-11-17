@@ -1,0 +1,6 @@
+__pycache__/
+*.log
+real_run_*.json
+adaptive_summary_*.json
+analyzer_outputs/
+nohup.out
